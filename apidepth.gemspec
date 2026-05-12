@@ -37,9 +37,11 @@ Gem::Specification.new do |spec|
   # -------------------------------------------------------------------------
 
   # json stdlib is bundled with Ruby but can be installed as a standalone gem.
-  # Pin to >= 2.7.2 — check the RubyGems advisory database before each release
-  # to confirm this lower bound is still free of known CVEs.
-  spec.add_dependency "json", ">= 2.7.2"
+  # CVE-2026-33210 (CVSS 9.1): format string injection when allow_duplicate_key: false
+  # is used to parse user-supplied documents. Patched in 2.15.2.1, 2.17.1.2, 2.19.2.
+  # We don't use allow_duplicate_key ourselves, but pin to a safe floor to protect
+  # users who do.
+  spec.add_dependency "json", ">= 2.19.2"
 
   # -------------------------------------------------------------------------
   # Development dependencies

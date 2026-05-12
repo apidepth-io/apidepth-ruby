@@ -1,0 +1,221 @@
+# apidepth
+
+Passive outbound API latency monitoring for Rails. Captures real production latency to third-party APIs — Stripe, OpenAI, Twilio, and others — without synthetic probes, without payload capture, and without changes to your application code beyond a one-time initializer.
+
+---
+
+## How it works
+
+Most API monitoring tools run scheduled probes from their own servers and measure latency to a vendor endpoint. That tells you how fast the vendor responds to *them*, from *their* location, to a test request. It doesn't tell you what your users are experiencing.
+
+Apidepth instruments `Net::HTTP` directly. Every outbound HTTP call your application makes to a known vendor is timed at the socket level, tagged with outcome and environment metadata, and batched to the Apidepth collector in the background. No payloads are captured. No credentials touch our infrastructure. The latency measurement is from your server to the vendor — the number your users feel.
+
+The second differentiator is benchmarking. Because Apidepth aggregates anonymized timing data across all customers, your dashboard can show not just "your Stripe p95 is 420ms" but "the fleet median is 280ms — you may have a regional routing issue." That comparison is only possible with real traffic from real deployments, which is why no synthetic probe tool can offer it.
+
+---
+
+## Installation
+
+Add to your `Gemfile`:
+
+```ruby
+gem "apidepth"
+```
+
+Run:
+
+```
+bundle install
+```
+
+---
+
+## Quick start
+
+Create `config/initializers/apidepth.rb`:
+
+```ruby
+Apidepth.configure do |config|
+  config.api_key = ENV["APIDEPTH_API_KEY"]
+end
+```
+
+That's it. The Railtie wires the instrumentation automatically. No code changes elsewhere.
+
+Get your API key at [apidepth.io](https://apidepth.io).
+
+---
+
+## Configuration
+
+All options with their defaults:
+
+```ruby
+Apidepth.configure do |config|
+  # Required. Your account API key.
+  config.api_key = ENV["APIDEPTH_API_KEY"]
+
+  # Disable in test environments. Default: true.
+  config.enabled = !Rails.env.test?
+
+  # Fraction of events to capture. 1.0 = 100%, 0.1 = 10%.
+  # Use a lower value if your application makes thousands of vendor
+  # calls per minute and you want to reduce collector traffic.
+  # Default: 1.0
+  config.sample_rate = 1.0
+
+  # Hosts to exclude from instrumentation entirely.
+  # Useful for internal services or staging vendors you don't want measured.
+  # Default: []
+  config.ignored_hosts = ["api.internal.mycompany.com"]
+
+  # Override the environment tag on events. Defaults to Rails.env at boot.
+  # Only set this if you need something other than Rails.env — for example,
+  # if you want to distinguish "production-us" from "production-eu".
+  # Default: Rails.env (set automatically by the Railtie)
+  config.environment = "production-us"
+
+  # Called on every flush failure, in addition to the built-in warn log.
+  # Use this to route failures to your existing error tracker.
+  # Default: nil
+  config.on_flush_error = ->(error, context) {
+    Sentry.capture_exception(error, extra: context)
+  }
+
+  # How often (in seconds) background events are batched and sent.
+  # Lower values reduce per-flush event volume; higher values reduce
+  # collector traffic. Default: 20
+  config.flush_interval = 20
+
+  # Path for the local vendor registry cache. Must be an absolute path.
+  # The registry is fetched from Apidepth's servers and cached here so
+  # cold starts don't block on a network fetch.
+  # Default: "/tmp/apidepth_registry.json"
+  config.registry_cache_path = "/tmp/apidepth_registry.json"
+end
+```
+
+---
+
+## What gets captured
+
+Every event contains:
+
+| Field | Description |
+|-------|-------------|
+| `vendor` | Vendor slug, e.g. `"stripe"`, `"openai"` |
+| `endpoint` | Normalized path, e.g. `"/v1/charges/:id"` |
+| `method` | HTTP verb: `"GET"`, `"POST"`, etc. |
+| `status` | HTTP status code, or `nil` on timeout |
+| `outcome` | `:success`, `:client_error`, `:server_error`, `:timeout`, `:unknown` |
+| `duration_ms` | Wall-clock time in milliseconds, including DNS and SSL on first connection |
+| `cold_start` | `true` if this request paid for SSL handshake; excluded from p95 calculations |
+| `env` | Environment tag from `config.environment` or `Rails.env` |
+| `ts` | Unix timestamp in milliseconds |
+
+### What is never captured
+
+- Request or response **bodies**
+- Request or response **headers** (including Authorization)
+- **Query string parameters**
+- Any credential, token, or secret your application uses to authenticate with a vendor
+- User identifiers or PII of any kind
+
+Path normalization strips resource IDs before the event leaves your server. `/v1/charges/ch_3Ox4Kz2e` becomes `/v1/charges/:id`. If a vendor's path contains something that looks like user data (an email address in a path segment, for example), it may not be normalized — review your vendor's URL structure if this is a concern.
+
+---
+
+## Supported vendors
+
+The bundled registry covers the following vendors out of the box. New vendors and endpoint patterns are pushed to all SDK installs via the remote registry without requiring a gem update.
+
+| Vendor | Host |
+|--------|------|
+| Stripe | `api.stripe.com` |
+| OpenAI | `api.openai.com` |
+| Anthropic | `api.anthropic.com` |
+| Twilio | `api.twilio.com` |
+| Resend | `api.resend.com` |
+| GitHub | `api.github.com` |
+
+Calls to hosts not in the registry are ignored — Apidepth only tracks third-party vendor dependencies, not internal services.
+
+To request a vendor: [open an issue](https://github.com/apidepth/apidepth-ruby/issues).
+
+---
+
+## Puma cluster mode
+
+The Railtie handles `after_fork` automatically on Rails 7.1+ via `ActiveSupport::ForkTracker`. If you're on Rails 6.x or 7.0, add one line to `config/puma.rb` to ensure each worker gets a clean collector instance:
+
+```ruby
+# config/puma.rb
+on_worker_boot { Apidepth::Collector.reset! }
+```
+
+To flush the master process queue before workers fork (recommended):
+
+```ruby
+# config/puma.rb
+before_fork { Apidepth::Collector.instance.flush! }
+on_worker_boot { Apidepth::Collector.reset! }
+```
+
+---
+
+## Debugging
+
+Check the collector's internal state from a Rails console:
+
+```ruby
+Apidepth::Collector.instance.stats
+# => {
+#      queue_size: 0,
+#      consecutive_failures: 0,
+#      total_dropped: 0,
+#      last_flush_at: 2026-05-11 14:32:07 UTC
+#    }
+```
+
+`last_flush_at` is only updated when events are actually delivered to the collector. If it's nil or stale, check your `api_key` and network connectivity.
+
+`total_dropped` counts events discarded due to backpressure (queue full). A non-zero value means your flush interval is too long for your traffic volume — lower `config.flush_interval` or raise `config.sample_rate` below 1.0.
+
+If flush errors are reaching `on_flush_error`, the error message includes the HTTP status code without echoing back credentials or response bodies.
+
+---
+
+## Compatibility
+
+| | Minimum |
+|-|---------|
+| Ruby | 2.7 |
+| Rails | 6.1 |
+| Rack | 2.2.12 |
+
+The gem uses `Module#prepend` to instrument `Net::HTTP`. Most HTTP clients in the Ruby ecosystem (`Faraday`, `HTTParty`, `RestClient`, `http.rb`) delegate to `Net::HTTP` internally and are instrumented automatically without additional configuration.
+
+If another gem in your stack uses `alias_method` to redefine `Net::HTTP#request` after the Apidepth initializer runs, instrumentation will be silently bypassed. Symptoms: events stop appearing in your dashboard. Fix: move `require "apidepth"` or the initializer to load last. Known affected gems: none currently identified.
+
+Fiber-based servers (Falcon, Async::HTTP): `Thread.current` locals used by Apidepth are not inherited by fibers. Instrumentation is skipped for requests running in a fiber context. Support is on the roadmap.
+
+---
+
+## Contributing
+
+```
+git clone https://github.com/apidepth/apidepth-ruby
+cd apidepth-ruby
+bundle install
+bundle exec rspec
+```
+
+The test suite requires no external services — all HTTP is stubbed via WebMock.
+
+To add a vendor to the bundled registry, edit `BUNDLED_BASELINE` in `lib/apidepth/vendor_registry.rb` and add corresponding tests to `spec/apidepth/sdk_spec.rb`. Path normalization patterns should be ordered most-specific first.
+
+---
+
+## License
+
+MIT. See [LICENSE](LICENSE).

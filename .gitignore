@@ -1,0 +1,35 @@
+# Bundler
+Gemfile.lock
+/.bundle/
+/vendor/bundle/
+
+# Built gem artifacts
+*.gem
+/pkg/
+
+# RSpec
+/spec/examples.txt
+
+# Runtime state
+/tmp/
+
+# Coverage
+/coverage/
+.simplecov
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor
+.DS_Store
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# Gem signing keys — never commit private keys
+*.pem
+gem-private_key.pem

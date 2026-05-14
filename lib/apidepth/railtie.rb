@@ -27,6 +27,7 @@ module Apidepth
       Apidepth.configuration.environment ||= Rails.env.to_s
 
       Net::HTTP.prepend(Apidepth::NetHTTPInstrumentation)
+      Apidepth::VendorRegistry.load_extra_vendors(Apidepth.configuration.extra_vendors)
       Apidepth::RegistryLoader.load_and_start
 
       if Rails.env.development?

@@ -76,6 +76,16 @@ module Apidepth
         [vendor, path]
       end
 
+      # Merge customer-defined host→vendor mappings from config.extra_vendors.
+      # Called once at Railtie boot after the user's configure block has run.
+      # Does not touch @patterns — custom vendors use generic path normalization only.
+      def load_extra_vendors(extra_vendors)
+        return if extra_vendors.nil? || extra_vendors.empty?
+        @mutex.synchronize do
+          extra_vendors.each { |name, host| @hosts[host.to_s] = name.to_s }
+        end
+      end
+
       def replace(registry_json)
         new_hosts    = build_hosts(registry_json)
         new_patterns = build_patterns(registry_json)

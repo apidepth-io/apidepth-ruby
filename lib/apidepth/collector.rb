@@ -224,10 +224,12 @@ module Apidepth
 
       validate_api_key!(key)
 
+      extra = Apidepth.configuration.extra_vendors
       payload = {
-        batch: events,
-        sdk:   Apidepth.sdk_metadata
-      }
+        batch:         events,
+        sdk:           Apidepth.sdk_metadata,
+        extra_vendors: extra.empty? ? nil : extra,
+      }.compact
 
       Thread.current[:apidepth_skip] = true
 

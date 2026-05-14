@@ -11,7 +11,8 @@ module Apidepth
                   :ignored_hosts,
                   :on_flush_error,
                   :environment,      # e.g. "production" — set by Railtie from Rails.env
-                  :sample_rate       # Float 0.0–1.0, default 1.0 (100% of events captured)
+                  :sample_rate,      # Float 0.0–1.0, default 1.0 (100% of events captured)
+                  :extra_vendors     # Hash of vendor_name => host, e.g. { "my-api" => "api.myservice.com" }
 
     def initialize
       @enabled                   = true
@@ -23,6 +24,7 @@ module Apidepth
       @on_flush_error            = nil
       @environment               = nil   # Railtie sets this to Rails.env at boot
       @sample_rate               = 1.0   # capture everything by default
+      @extra_vendors             = {}    # customer-defined host mappings
     end
   end
 end

@@ -92,6 +92,17 @@ Apidepth.configure do |config|
   # cold starts don't block on a network fetch.
   # Default: "/tmp/apidepth_registry.json"
   config.registry_cache_path = "/tmp/apidepth_registry.json"
+
+  # Custom vendors your app calls that aren't in the global registry.
+  # Key: vendor name (matches the vendor field in your dashboard).
+  # Value: the hostname the SDK should watch for.
+  # Tracking starts immediately at boot — no dashboard visit required.
+  # Mappings sync to your dashboard automatically on the next event flush.
+  # Default: {}
+  config.extra_vendors = {
+    "my-payments-api" => "api.payments.internal.com",
+    "fulfillment"     => "fulfillment.myco.io",
+  }
 end
 ```
 
@@ -138,9 +149,9 @@ The bundled registry covers the following vendors out of the box. New vendors an
 | Resend | `api.resend.com` |
 | GitHub | `api.github.com` |
 
-Calls to hosts not in the registry are ignored — Apidepth only tracks third-party vendor dependencies, not internal services.
+Calls to hosts not in the registry are ignored by default. Use `config.extra_vendors` to track additional hosts — internal APIs, homegrown services, or vendors not yet in the global registry. Custom vendors use generic path normalization (UUID stripping, long numeric ID stripping) rather than vendor-specific patterns.
 
-To request a vendor: [open an issue](https://github.com/apidepth/apidepth-ruby/issues).
+To request a vendor be added to the global registry: [open an issue](https://github.com/apidepth/apidepth-ruby/issues).
 
 ---
 

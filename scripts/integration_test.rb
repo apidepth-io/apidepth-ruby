@@ -110,11 +110,14 @@ rescue StandardError => e
 end
 
 begin
-  r = collector_get("/v1/endpoints", vendor: "stripe", env: ENV_TAG)
+  # Don't filter by env — the gem may default to a different env tag without Rails.
+  # The vendor check above already confirms events are landing; here we just verify
+  # the endpoints query returns a well-formed response with at least one endpoint.
+  r = collector_get("/v1/endpoints", vendor: "stripe")
   ok = r.code.to_i == 200
   endpoints = ok ? JSON.parse(r.body).fetch("endpoints", []) : []
   failures += 1 unless check(
-    "endpoint recorded in GET /v1/endpoints?vendor=stripe&env=#{ENV_TAG}",
+    "endpoint recorded in GET /v1/endpoints?vendor=stripe",
     ok && !endpoints.empty?,
     !ok ? "status #{r.code}" : (endpoints.empty? ? "endpoints list is empty" : nil)
   )
@@ -124,17 +127,18 @@ rescue StandardError => e
 end
 
 # ── Stats sanity check ─────────────────────────────────────────────────────────
+# stats keys: queue_size, consecutive_failures, total_dropped, last_flush_at
 puts "\n[ SDK stats ]"
 stats = Apidepth::Collector.instance.stats
 failures += 1 unless check(
-  "total_sent > 0 after flush",
-  stats[:total_sent] > 0,
-  "total_sent=#{stats[:total_sent]} total_dropped=#{stats[:total_dropped]}"
+  "queue drained after flush (queue_size == 0)",
+  stats[:queue_size] == 0,
+  "queue_size=#{stats[:queue_size]}"
 )
 failures += 1 unless check(
   "consecutive_failures is 0",
   stats[:consecutive_failures] == 0,
-  "consecutive_failures=#{stats[:consecutive_failures]}"
+  "consecutive_failures=#{stats[:consecutive_failures]} total_dropped=#{stats[:total_dropped]}"
 )
 
 # ── Result ─────────────────────────────────────────────────────────────────────

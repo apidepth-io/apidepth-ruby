@@ -110,14 +110,14 @@ rescue StandardError => e
 end
 
 begin
-  # Don't filter by env — the gem may default to a different env tag without Rails.
-  # The vendor check above already confirms events are landing; here we just verify
-  # the endpoints query returns a well-formed response with at least one endpoint.
-  r = collector_get("/v1/endpoints", vendor: "stripe")
+  # The collector's /v1/endpoints defaults env="production" if not provided.
+  # Pass the gem's actual configured environment so the query matches.
+  gem_env = Apidepth.configuration.environment
+  r = collector_get("/v1/endpoints", vendor: "stripe", env: gem_env)
   ok = r.code.to_i == 200
   endpoints = ok ? JSON.parse(r.body).fetch("endpoints", []) : []
   failures += 1 unless check(
-    "endpoint recorded in GET /v1/endpoints?vendor=stripe",
+    "endpoint recorded in GET /v1/endpoints?vendor=stripe&env=#{gem_env}",
     ok && !endpoints.empty?,
     !ok ? "status #{r.code}" : (endpoints.empty? ? "endpoints list is empty" : nil)
   )

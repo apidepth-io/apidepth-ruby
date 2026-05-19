@@ -71,17 +71,22 @@ module Apidepth
                 else               :unknown
                 end
 
+      now_ms = Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond)
+      rl = Apidepth::RateLimitHeaders.extract(response, now_ms)
+
       Apidepth::Collector.instance.record(
         Apidepth::Event.build(
-          vendor:      vendor,
-          endpoint:    normalized_path,
-          method:      req.method,
-          status:      status,
-          outcome:     outcome,
-          duration_ms: duration_ms,
-          cold_start:  cold_start,
-          env:         resolve_env,
-          ts:          Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond)
+          {
+            vendor:      vendor,
+            endpoint:    normalized_path,
+            method:      req.method,
+            status:      status,
+            outcome:     outcome,
+            duration_ms: duration_ms,
+            cold_start:  cold_start,
+            env:         resolve_env,
+            ts:          now_ms,
+          }.merge(rl || {})
         )
       )
     rescue StandardError

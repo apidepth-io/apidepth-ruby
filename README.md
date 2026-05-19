@@ -223,6 +223,16 @@ bundle exec rspec
 
 The test suite requires no external services — all HTTP is stubbed via WebMock.
 
+For end-to-end verification against a live collector, use the integration test script:
+
+```bash
+COLLECTOR_URL=https://your-collector.railway.app \
+API_KEY=apd_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+ruby scripts/integration_test.rb
+```
+
+This exercises the full pipeline: `Net::HTTP` instrumentation → event capture → flush → collector ingest → query API verification. It requires a running collector and a valid API key. It is separate from the unit suite and does not run in CI.
+
 To add a vendor to the bundled registry, edit `BUNDLED_BASELINE` in `lib/apidepth/vendor_registry.rb` and add corresponding tests to `spec/apidepth/sdk_spec.rb`. Path normalization patterns should be ordered most-specific first.
 
 ---

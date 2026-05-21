@@ -9,6 +9,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+---
+
+## [0.2.1] — 2026-05-21
+
+### Added
+
+- **Missing API key warning** — non-Rails installs (plain Ruby, Sinatra, etc.) now log a
+  one-time `warn` on the first flush attempt when no `api_key` is configured, pointing to
+  `www.apidepth.io` to create an account. Previously events were silently dropped with no
+  feedback outside of a Rails boot-time message. The warning fires at most once per process
+  (or per Puma worker after `reset!`) and does not repeat on subsequent flushes.
+
 ### Fixed
 
 - **Load-order bug** — `VendorRegistry.initialize_registry` called `Apidepth.logger` at

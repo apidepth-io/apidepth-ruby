@@ -16,6 +16,8 @@ No payload capture. No credentials touch our infrastructure. No changes to your 
 
 **Alerts and weekly digest.** Apidepth fires alerts when vendor latency crosses your configured threshold and sends a weekly digest summarizing what changed. Monitoring without alerting is passive; this is working for you.
 
+**Rate limit intelligence.** Apidepth tracks 429 patterns and projects quota burn-down before you hit the ceiling — with a burn-down card showing time-to-throttle at current request rate.
+
 ---
 
 ## Installation

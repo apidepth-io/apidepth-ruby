@@ -18,6 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout collector (SSRF fixture)
+        uses: actions/checkout@v4
+        with:
+          repository: cmwright33/apidepth-collector
+          path: apidepth-collector
+          sparse-checkout: tests/fixtures
+          sparse-checkout-cone-mode: false
+
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}

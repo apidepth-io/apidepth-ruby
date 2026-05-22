@@ -92,6 +92,9 @@ module Apidepth
       end
     end
 
+    # Canonical test cases live in apidepth-collector/tests/fixtures/private_host_cases.json.
+    # All SDK implementations load that fixture and must pass every case. Any change here
+    # must be accompanied by a fixture update and a matching change in every other SDK.
     PRIVATE_HOST_PATTERN = /
       \Alocalhost\z          |
       \A127\.                |
@@ -101,7 +104,7 @@ module Apidepth
       \A172\.(1[6-9]|2\d|3[01])\. |
       \A192\.168\.           |
       \A\[?::1\]?\z          |
-      \A\[?fc                |
+      \A\[?f[cd]             |
       \A\[?fe80:
     /xi.freeze
 

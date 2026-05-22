@@ -14,6 +14,7 @@
 #   Collector               — background queue, flush thread, watchdog, backpressure
 #   Event                   — schema validation (required fields, frozen payload)
 
+require "json"
 require "spec_helper"
 
 # =============================================================================
@@ -707,6 +708,33 @@ RSpec.describe "Apidepth::Collector security" do
       expect do
         collector.send(:validate_collector_url!, url("https://2852039166/v1/events"))
       end.to raise_error(ArgumentError, /private/)
+    end
+  end
+
+  describe "PRIVATE_HOST_PATTERN — shared fixture" do
+    # Fixture lives in apidepth-collector/tests/fixtures/private_host_cases.json.
+    # Loaded via relative path for local dev (both repos in same parent dir) or
+    # from a shallow collector checkout placed at ../apidepth-collector/ in CI.
+    # See .github/workflows/ci.yml for the checkout step.
+    fixture_paths = [
+      File.expand_path("../../apidepth-collector/tests/fixtures/private_host_cases.json", __dir__),
+      File.expand_path("../apidepth-collector/tests/fixtures/private_host_cases.json", __dir__),
+    ]
+    fixture_path = fixture_paths.find { |p| File.exist?(p) }
+    raise "private_host_cases.json not found — see spec/sdk_spec.rb for setup" unless fixture_path
+
+    fixture = JSON.parse(File.read(fixture_path))
+
+    fixture["must_block"].each do |tc|
+      it "blocks #{tc['host']} (#{tc['label']})" do
+        expect(Apidepth::Collector::PRIVATE_HOST_PATTERN).to match(tc["host"])
+      end
+    end
+
+    fixture["must_allow"].each do |tc|
+      it "allows #{tc['host']} (#{tc['label']})" do
+        expect(Apidepth::Collector::PRIVATE_HOST_PATTERN).not_to match(tc["host"])
+      end
     end
   end
 

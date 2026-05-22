@@ -99,6 +99,8 @@ module Apidepth
       \Alocalhost\z          |
       \A127\.                |
       \A0\.0\.0\.0\z         |
+      \A0\z                  |
+
       \A169\.254\.           |
       \A10\.                 |
       \A172\.(1[6-9]|2\d|3[01])\. |
@@ -290,7 +292,7 @@ module Apidepth
 
       if host.match?(/\A\d+\z/)
         int = host.to_i
-        if int.positive? && int <= 0xFFFFFFFF
+        if int >= 0 && int <= 0xFFFFFFFF
           host = [int >> 24, (int >> 16) & 0xFF, (int >> 8) & 0xFF,
                   int & 0xFF].join(".")
         end

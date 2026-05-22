@@ -8,12 +8,10 @@ Gem::Specification.new do |spec|
   spec.authors     = ["Apidepth"]
   spec.email       = ["hello@apidepth.io"]
   spec.summary     = "Know if your API slowness is your code or the vendor's"
-  spec.description = <<~DESC
-    Know if your API slowness is your code or the vendor's. Apidepth instruments
-    Net::HTTP to track real production latency to Stripe, OpenAI, Twilio and others
-    — then benchmarks your p95 against anonymized fleet data so you can see if it's
-    you, or everyone.
-  DESC
+  spec.description = "Know if your API slowness is your code or the vendor's. " \
+    "Apidepth instruments Net::HTTP to track real production latency to Stripe, " \
+    "OpenAI, Twilio and others — then benchmarks your p95 against anonymized fleet " \
+    "data so you can see if it's you, or everyone."
   spec.homepage    = "https://apidepth.io"
   spec.license     = "MIT"
 

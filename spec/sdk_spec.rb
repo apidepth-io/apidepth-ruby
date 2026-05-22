@@ -718,7 +718,7 @@ RSpec.describe "Apidepth::Collector security" do
     # See .github/workflows/ci.yml for the checkout step.
     fixture_paths = [
       File.expand_path("../../apidepth-collector/tests/fixtures/private_host_cases.json", __dir__),
-      File.expand_path("../apidepth-collector/tests/fixtures/private_host_cases.json", __dir__),
+      File.expand_path("../apidepth-collector/tests/fixtures/private_host_cases.json", __dir__)
     ]
     fixture_path = fixture_paths.find { |p| File.exist?(p) }
     raise "private_host_cases.json not found — see spec/sdk_spec.rb for setup" unless fixture_path

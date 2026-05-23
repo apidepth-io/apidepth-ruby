@@ -292,7 +292,7 @@ module Apidepth
 
       if host.match?(/\A\d+\z/)
         int = host.to_i
-        if int >= 0 && int <= 0xFFFFFFFF
+        if int.between?(0, 0xFFFFFFFF)
           host = [int >> 24, (int >> 16) & 0xFF, (int >> 8) & 0xFF,
                   int & 0xFF].join(".")
         end

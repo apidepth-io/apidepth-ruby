@@ -18,8 +18,6 @@ module Apidepth
       start_refresh_thread
     end
 
-    private
-
     def self.start_refresh_thread
       Thread.new do
         loop do

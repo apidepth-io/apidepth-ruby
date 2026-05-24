@@ -240,15 +240,7 @@ module Apidepth
 
       key = Apidepth.configuration.api_key
       if key.nil? || key.empty?
-        @stats_mutex.synchronize do
-          unless @warned_no_key
-            @warned_no_key = true
-            Apidepth.logger&.warn(
-              "[Apidepth] No API key configured — events are being dropped. " \
-              "Visit www.apidepth.io to create an account and get your key."
-            )
-          end
-        end
+        warn_no_api_key!
         return
       end
 
@@ -305,6 +297,18 @@ module Apidepth
       raise ArgumentError,
             "Apidepth collector_url must not target private, loopback, or link-local " \
             "addresses (got #{url.host.inspect})."
+    end
+
+    def warn_no_api_key!
+      @stats_mutex.synchronize do
+        unless @warned_no_key
+          @warned_no_key = true
+          Apidepth.logger&.warn(
+            "[Apidepth] No API key configured — events are being dropped. " \
+            "Visit www.apidepth.io to create an account and get your key."
+          )
+        end
+      end
     end
 
     def validate_api_key!(key)

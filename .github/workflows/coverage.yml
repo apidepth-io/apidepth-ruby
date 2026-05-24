@@ -1,0 +1,11 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  coverage:
+    uses: apidepth-io/apidepth-tooling/.github/workflows/coverage-ruby.yml@main

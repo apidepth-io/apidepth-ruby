@@ -2,6 +2,14 @@
 require "simplecov"
 SimpleCov.start
 
+if ENV["COVERAGE"]
+  require "simplecov"
+  SimpleCov.start do
+    add_filter "/spec/"
+    add_filter "/vendor/"
+  end
+end
+
 require "fileutils"
 require "webmock/rspec"
 require "apidepth"

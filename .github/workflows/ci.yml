@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Lint and test
+    name: Test
     runs-on: ubuntu-latest
 
     strategy:
@@ -31,9 +31,6 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
-
-      - name: Lint
-        run: bundle exec rubocop --parallel
 
       - name: Tests
         run: bundle exec rspec

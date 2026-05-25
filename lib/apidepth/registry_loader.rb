@@ -12,9 +12,29 @@ module Apidepth
     # registry (remote → disk cache → bundled baseline already loaded by
     # VendorRegistry.initialize_registry) and starts the background
     # refresh thread.
+    #
+    # Startup strategy: apply the on-disk cache synchronously so the in-process
+    # registry is populated immediately (no blocking network call on the boot
+    # thread). The initial remote fetch is dispatched to a background thread so
+    # that slow or unreachable endpoints (CI, air-gapped environments) do not
+    # block Rails boot for up to 8 seconds (open_timeout + read_timeout).
+    # The background refresh loop (start_refresh_thread) is unchanged.
     def self.load_and_start
-      registry = fetch_remote || load_from_disk
-      VendorRegistry.replace(registry) if registry
+      # Apply disk cache immediately — zero network latency, registry is ready
+      # before the application begins serving requests.
+      disk_registry = load_from_disk
+      VendorRegistry.replace(disk_registry) if disk_registry
+
+      # Fetch the freshest registry from the network in the background so the
+      # boot thread is never blocked by the remote request.
+      Thread.new do
+        registry = fetch_remote
+        VendorRegistry.replace(registry) if registry
+      end.tap do |t|
+        t.abort_on_exception = false
+        t.name = "apidepth-registry-init"
+      end
+
       start_refresh_thread
     end
 

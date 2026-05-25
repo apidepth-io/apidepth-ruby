@@ -72,6 +72,7 @@ module Apidepth
       headers.each do |name|
         val = response[name]
         next unless val
+        next unless val.strip.match?(/\A\d+\z/)
 
         n = val.strip.to_i
         return n if n >= 0

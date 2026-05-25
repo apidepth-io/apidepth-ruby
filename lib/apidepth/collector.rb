@@ -189,6 +189,8 @@ module Apidepth
     end
 
     def drain_queue
+      return [].freeze if @queue.empty?
+
       events = []
       events << @queue.pop(true) while events.size < MAX_BATCH_SIZE
       events

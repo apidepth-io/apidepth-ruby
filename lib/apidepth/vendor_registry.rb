@@ -64,6 +64,10 @@ module Apidepth
       [%r{/[a-z0-9]{24,}}, "/:token"]
     ].freeze
 
+    # True when the runtime supports Regexp.timeout (introduced in Ruby 3.2).
+    # Used by apply_vendor_normalizers to enable ReDoS protection when available.
+    RUBY_GTE_3_2 = Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2")
+
     class << self
       def identify(host, raw_path)
         hosts, patterns = @mutex.synchronize { [@hosts, @patterns] }
@@ -169,11 +173,28 @@ module Apidepth
         path.split("?").first
       end
 
+      # First-match-wins: iteration stops at the first pattern that matches the
+      # path. Vendor authors must order rules from most-specific to least-specific
+      # to ensure that narrower patterns (e.g. /v1/charges/:id) are tested before
+      # broader catch-alls (e.g. /v1/:resource/:id). A less-specific rule placed
+      # earlier will shadow any more-specific rules that follow it.
+      #
+      # ReDoS protection: on Ruby >= 3.2 we apply a per-match timeout of 1ms so
+      # that a pathological pattern from a compromised or misconfigured registry
+      # cannot stall the request thread indefinitely. On older Ruby, Regexp.timeout
+      # is not available — use a trusted, internally-reviewed registry source.
       def apply_vendor_normalizers(rules, path)
+        if RUBY_GTE_3_2
+          saved_timeout = Regexp.timeout
+          Regexp.timeout = 0.001
+        end
+
         rules.each do |pattern, replacement|
           return path.gsub(pattern, replacement) if path.match?(pattern)
         end
         path
+      ensure
+        Regexp.timeout = saved_timeout if RUBY_GTE_3_2
       end
 
       def apply_generic_normalizers(path)

@@ -88,7 +88,8 @@ module Apidepth
           }.merge(rl || {})
         )
       )
-    rescue StandardError
+    rescue StandardError => e
+      Apidepth.logger&.debug("[Apidepth] Instrumentation error: #{e.class}: #{e.message}")
       nil
     end
 
@@ -110,7 +111,8 @@ module Apidepth
           ts: Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond)
         )
       )
-    rescue StandardError
+    rescue StandardError => e
+      Apidepth.logger&.debug("[Apidepth] Instrumentation error: #{e.class}: #{e.message}")
       nil
     end
   end

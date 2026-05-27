@@ -6,7 +6,9 @@
 
 desc "Push gem to RubyGems (called by rubygems/release-gem@v1 in CI)"
 task :release do
-  gems = Dir["apidepth-*.gem"]
-  abort "No .gem file found. Run: gem build apidepth.gemspec" if gems.empty?
+  gems = Dir["pkg/apidepth-*.gem"]
+  if gems.empty?
+    abort "No .gem file found in pkg/. Run: mkdir -p pkg && gem build apidepth.gemspec && mv apidepth-*.gem pkg/"
+  end
   gems.each { |g| sh "gem push #{g}" }
 end

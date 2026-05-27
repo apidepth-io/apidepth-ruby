@@ -1333,7 +1333,7 @@ RSpec.describe Apidepth::Configuration do
     expect(config.flush_interval).to eq(20)
     expect(config.registry_refresh_interval).to eq(6 * 60 * 60)
     expect(config.registry_cache_path).to eq("/tmp/apidepth_registry.json")
-    expect(config.ignored_hosts).to eq([])
+    expect(config.ignored_hosts).to be_empty
     expect(config.on_flush_error).to be_nil
     expect(config.collector_url).to be_nil
     expect(config.environment).to be_nil

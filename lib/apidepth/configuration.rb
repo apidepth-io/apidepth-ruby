@@ -8,11 +8,12 @@ module Apidepth
                   :flush_interval,
                   :registry_refresh_interval,
                   :registry_cache_path,
-                  :ignored_hosts,
                   :on_flush_error,
                   :environment,      # e.g. "production" — set by Railtie from Rails.env
                   :sample_rate,      # Float 0.0–1.0, default 1.0 (100% of events captured)
                   :extra_vendors     # Hash of vendor_name => host, e.g. { "my-api" => "api.myservice.com" }
+
+    attr_reader :ignored_hosts
 
     def initialize
       @enabled                   = true

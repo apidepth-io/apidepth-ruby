@@ -291,6 +291,10 @@ module Apidepth
         if int.between?(0, 0xFFFFFFFF)
           host = [int >> 24, (int >> 16) & 0xFF, (int >> 8) & 0xFF,
                   int & 0xFF].join(".")
+        else
+          raise ArgumentError,
+                "Apidepth collector_url must not target private, loopback, or link-local " \
+                "addresses (got #{url.host.inspect})."
         end
       end
 

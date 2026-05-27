@@ -27,6 +27,14 @@ module Apidepth
       # every outbound HTTP request.
       Apidepth.configuration.environment ||= Rails.env.to_s
 
+      # Use a per-app cache path so concurrent apps on the same host don't
+      # share a world-readable /tmp file. Falls back to /tmp only if Rails.root
+      # is somehow unavailable.
+      if defined?(Rails.root) && Rails.root
+        Apidepth.configuration.registry_cache_path ||=
+          Rails.root.join("tmp/apidepth_registry.json").to_s
+      end
+
       Net::HTTP.prepend(Apidepth::NetHTTPInstrumentation)
       Apidepth::VendorRegistry.load_extra_vendors(Apidepth.configuration.extra_vendors)
       Apidepth::RegistryLoader.load_and_start
@@ -41,16 +49,9 @@ module Apidepth
     end
 
     # -------------------------------------------------------------------------
-    # 3. Flush queue on graceful shutdown.
-    #    at_exit fires on SIGTERM → graceful Puma/Unicorn shutdown.
-    #    flush! rescues internally so a network error at shutdown is not fatal.
-    # -------------------------------------------------------------------------
-    config.after_initialize do
-      at_exit { Apidepth::Collector.instance.flush! }
-    end
-
-    # -------------------------------------------------------------------------
-    # 4. Fork safety for Puma cluster mode / Spring.
+    # 3. Shutdown flush + fork safety.
+    #
+    #    at_exit: flush the queue on graceful shutdown (SIGTERM → Puma/Unicorn).
     #
     #    after_fork: reset the Collector singleton so each worker gets a fresh
     #    instance with its own flush thread. The master's flush thread is not
@@ -65,6 +66,8 @@ module Apidepth
     #    ActiveSupport::ForkTracker is available in Rails 7.1+.
     # -------------------------------------------------------------------------
     config.after_initialize do
+      at_exit { Apidepth::Collector.instance.flush! }
+
       if defined?(ActiveSupport::ForkTracker)
         ActiveSupport::ForkTracker.after_fork { Apidepth::Collector.reset! }
       elsif defined?(Puma)

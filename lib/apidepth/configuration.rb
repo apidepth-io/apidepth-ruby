@@ -20,11 +20,16 @@ module Apidepth
       @registry_refresh_interval = 6 * 60 * 60
       @registry_cache_path       = "/tmp/apidepth_registry.json"
       @collector_url             = nil
-      @ignored_hosts             = []
+      self.ignored_hosts         = []
       @on_flush_error            = nil
       @environment               = nil   # Railtie sets this to Rails.env at boot
       @sample_rate               = 1.0   # capture everything by default
       @extra_vendors             = {}    # customer-defined host mappings
+    end
+
+    def ignored_hosts=(hosts)
+      require "set"
+      @ignored_hosts = Set.new(hosts || [])
     end
   end
 end

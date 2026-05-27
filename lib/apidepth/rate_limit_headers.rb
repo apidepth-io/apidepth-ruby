@@ -103,6 +103,8 @@ module Apidepth
       # Pure numeric
       if str.match?(/\A\d+(?:\.\d+)?\z/)
         n = str.to_f
+        # >= 1_000_000_000 is a Unix timestamp (seconds since epoch, e.g. "1716000000");
+        # smaller values are seconds-from-now (Retry-After style, e.g. "30").
         return n >= 1_000_000_000 ? (n * 1_000).to_i : now_ms + (n * 1_000).to_i
       end
 

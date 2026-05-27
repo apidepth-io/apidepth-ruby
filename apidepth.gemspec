@@ -15,13 +15,11 @@ Gem::Specification.new do |spec|
   spec.homepage    = "https://apidepth.io"
   spec.license     = "MIT"
 
-  # Minimum Ruby version. We use:
-  #   - Module#prepend       (2.0+) — Net::HTTP instrumentation
-  #   - safe navigation &.  (2.3+) — logger calls
-  #   - Pattern matching     (n/a) — not used
-  # Ruby 2.7 gives us numbered block params and better warning suppression.
-  # Support for < 2.7 is not tested and not guaranteed.
-  spec.required_ruby_version = ">= 2.7.0"
+  # Minimum Ruby version matches CI (3.1–3.3). Ruby 3.1 introduced:
+  #   - Hash#except         — used in configuration helpers
+  #   - Fiber#scheduler API — compatible with our thread model
+  # Versions below 3.1 are not tested and not supported.
+  spec.required_ruby_version = ">= 3.1.0"
 
   spec.files = Dir[
     "lib/**/*.rb",

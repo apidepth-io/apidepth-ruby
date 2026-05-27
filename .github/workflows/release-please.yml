@@ -36,6 +36,6 @@ jobs:
           ruby-version: "3.3"
           bundler-cache: true
       - name: Build gem
-        run: gem build apidepth.gemspec
+        run: mkdir -p pkg && gem build apidepth.gemspec && mv apidepth-*.gem pkg/
       - name: Push to RubyGems
         uses: rubygems/release-gem@v1

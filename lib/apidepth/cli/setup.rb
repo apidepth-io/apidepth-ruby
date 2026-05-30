@@ -20,10 +20,10 @@ module Apidepth
 
       def self.run(argv = ARGV)
         options = parse_options(argv)
-        api_key      = options[:api_key]
+        api_key = options[:api_key]
         collector_url = options[:collector_url]
         ignored_hosts = options[:ignored_hosts] || []
-        no_prompt    = options[:no_prompt]
+        no_prompt = options[:no_prompt]
         framework_override = options[:framework]
 
         # Interactive: open dashboard and prompt for key
@@ -35,7 +35,7 @@ module Apidepth
           $stdout.print "\nPaste your API key: "
           api_key = $stdin.gets&.strip
           if api_key.nil? || api_key.empty?
-            $stderr.puts "No API key provided. Aborting."
+            warn "No API key provided. Aborting."
             exit 1
           end
         end
@@ -49,9 +49,7 @@ module Apidepth
           $stdout.puts "  Examples: *.internal, *.local, *.svc.cluster.local, *.railway.internal"
           $stdout.print "> "
           input = $stdin.gets&.strip || ""
-          unless input.empty?
-            ignored_hosts += input.split(",").map(&:strip).reject(&:empty?)
-          end
+          ignored_hosts += input.split(",").map(&:strip).reject(&:empty?) unless input.empty?
         end
 
         result = FrameworkDetector.detect(
@@ -73,8 +71,6 @@ module Apidepth
         _print_result(result, no_prompt: no_prompt)
       end
 
-      private
-
       def self.parse_options(argv)
         options = {}
         parser = OptionParser.new do |opts|
@@ -85,13 +81,18 @@ module Apidepth
             options[:ignored_hosts] = v.split(",").map(&:strip)
           end
           opts.on("--no-prompt", "Non-interactive mode; output to stdout only") { options[:no_prompt] = true }
-          opts.on("--framework NAME", "Override framework detection (rails|sinatra|generic)") { |v| options[:framework] = v }
-          opts.on_tail("-h", "--help", "Show this message") { puts opts; exit }
+          opts.on("--framework NAME", "Override framework detection (rails|sinatra|generic)") do |v|
+            options[:framework] = v
+          end
+          opts.on_tail("-h", "--help", "Show this message") do
+            puts opts
+            exit
+          end
         end
         begin
           parser.parse!(argv.dup)
         rescue OptionParser::InvalidOption => e
-          $stderr.puts e.message
+          warn e.message
           exit 1
         end
         options

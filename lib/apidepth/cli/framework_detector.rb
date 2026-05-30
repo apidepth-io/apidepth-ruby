@@ -16,11 +16,10 @@ module Apidepth
         _build_result(framework, api_key: api_key, ignored_hosts: ignored_hosts, collector_url: collector_url)
       end
 
-      private
-
       def self._detect_framework(dir)
         return :rails   if File.exist?(File.join(dir, "config/application.rb"))
         return :sinatra if File.exist?(File.join(dir, "config.ru"))
+
         :generic
       end
 

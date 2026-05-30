@@ -21,8 +21,8 @@ module Apidepth
         api_key, collector_url = _load_config(argv)
 
         unless api_key
-          $stderr.puts "No API key configured."
-          $stderr.puts "Run `bundle exec apidepth setup` or set APIDEPTH_API_KEY."
+          warn "No API key configured."
+          warn "Run `bundle exec apidepth setup` or set APIDEPTH_API_KEY."
           exit 1
         end
 
@@ -35,13 +35,11 @@ module Apidepth
           $stdout.puts "Visit your dashboard: https://apidepth.io/dashboard"
         rescue TestError => e
           $stdout.puts "✗"
-          $stderr.puts "\n#{e.message}"
-          $stderr.puts e.hint if e.hint
+          warn "\n#{e.message}"
+          warn e.hint if e.hint
           exit 1
         end
       end
-
-      private
 
       class TestError < StandardError
         attr_reader :hint
@@ -52,16 +50,16 @@ module Apidepth
         end
       end
 
-      def self._load_config(argv)
+      def self._load_config(_argv)
         # Try the SDK configuration first, fall back to environment variable
         begin
           require "apidepth"
           cfg = Apidepth.configuration
-          api_key = cfg.api_key || ENV["APIDEPTH_API_KEY"]
-          collector_url = cfg.collector_url || ENV["APIDEPTH_COLLECTOR_URL"]
+          api_key = cfg.api_key || ENV.fetch("APIDEPTH_API_KEY", nil)
+          collector_url = cfg.collector_url || ENV.fetch("APIDEPTH_COLLECTOR_URL", nil)
         rescue StandardError
-          api_key = ENV["APIDEPTH_API_KEY"]
-          collector_url = ENV["APIDEPTH_COLLECTOR_URL"]
+          api_key = ENV.fetch("APIDEPTH_API_KEY", nil)
+          collector_url = ENV.fetch("APIDEPTH_COLLECTOR_URL", nil)
         end
         [api_key, collector_url]
       end
@@ -89,7 +87,7 @@ module Apidepth
         start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl     = uri.scheme == "https"
+        http.use_ssl = uri.scheme == "https"
         http.read_timeout = TIMEOUT_SECONDS
         http.open_timeout = TIMEOUT_SECONDS
 

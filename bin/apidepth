@@ -25,7 +25,7 @@ when nil, "--help", "-h"
   puts ""
   puts "Run `bundle exec apidepth <subcommand> --help` for subcommand options."
 else
-  $stderr.puts "Unknown subcommand: #{subcommand.inspect}"
-  $stderr.puts "Run `bundle exec apidepth --help` for usage."
+  warn "Unknown subcommand: #{subcommand.inspect}"
+  warn "Run `bundle exec apidepth --help` for usage."
   exit 1
 end

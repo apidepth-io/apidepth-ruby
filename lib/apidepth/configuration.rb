@@ -18,9 +18,10 @@ module Apidepth
                   :registry_refresh_interval,
                   :registry_cache_path,
                   :on_flush_error,
-                  :environment,      # e.g. "production" — set by Railtie from Rails.env
-                  :sample_rate,      # Float 0.0–1.0, default 1.0 (100% of events captured)
-                  :extra_vendors     # Hash of vendor_name => host, e.g. { "my-api" => "api.myservice.com" }
+                  :environment,        # e.g. "production" — set by Railtie from Rails.env
+                  :sample_rate,        # Float 0.0–1.0, default 1.0 (100% of events captured)
+                  :extra_vendors,      # Hash of vendor_name => host, e.g. { "my-api" => "api.myservice.com" }
+                  :capture_model_names # Boolean — read model field from AI vendor JSON responses
 
     attr_reader :ignored_hosts, :collector_url
 
@@ -35,6 +36,7 @@ module Apidepth
       @environment               = nil   # Railtie sets this to Rails.env at boot
       @sample_rate               = 1.0   # capture everything by default
       @extra_vendors             = {}    # customer-defined host mappings
+      @capture_model_names       = true  # read model field from AI vendor JSON responses
       _rebuild_ignored_hosts
     end
 

@@ -2167,7 +2167,8 @@ RSpec.describe Apidepth::ModelNameExtractor do
     context "content-type guard" do
       it "returns nil for text/event-stream (streaming response)" do
         body = "data: {}\n\n"
-        expect(described_class.extract("api.openai.com", mock_ai_response(content_type: "text/event-stream", body_str: body)))
+        expect(described_class.extract("api.openai.com",
+                                       mock_ai_response(content_type: "text/event-stream", body_str: body)))
           .to be_nil
       end
 
@@ -2213,7 +2214,7 @@ RSpec.describe Apidepth::ModelNameExtractor do
       it "handles oversized body without raising (truncated JSON is silently nil)" do
         # Truncated JSON is invalid — extraction returns nil, does not raise.
         # Real AI API responses are always < 8KB so this edge case is academic.
-        body = %({"model":"gpt-4o","data":"#{"x" * 20_000}"})
+        body = %({"model":"gpt-4o","data":"#{'x' * 20_000}"})
         result = described_class.extract("api.openai.com", mock_ai_response(body_str: body))
         expect([nil, "gpt-4o"]).to include(result)
       end

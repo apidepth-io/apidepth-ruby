@@ -72,21 +72,23 @@ module Apidepth
 
       now_ms = Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond)
       rl = Apidepth::RateLimitHeaders.extract(response, now_ms)
+      model_name = Apidepth::ModelNameExtractor.extract(address, response)
+
+      event_attrs = {
+        vendor: vendor,
+        endpoint: normalized_path,
+        method: req.method,
+        status: status,
+        outcome: outcome,
+        duration_ms: duration_ms,
+        cold_start: cold_start,
+        env: resolve_env,
+        ts: now_ms
+      }.merge(rl || {})
+      event_attrs[:model_name] = model_name if model_name
 
       Apidepth::Collector.instance.record(
-        Apidepth::Event.build(
-          {
-            vendor: vendor,
-            endpoint: normalized_path,
-            method: req.method,
-            status: status,
-            outcome: outcome,
-            duration_ms: duration_ms,
-            cold_start: cold_start,
-            env: resolve_env,
-            ts: now_ms
-          }.merge(rl || {})
-        )
+        Apidepth::Event.build(event_attrs)
       )
     rescue StandardError => e
       Apidepth.logger&.debug("[Apidepth] Instrumentation error: #{e.class}: #{e.message}")

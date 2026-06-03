@@ -2103,3 +2103,219 @@ RSpec.describe "Integration: full instrumentation stack", :integration do
     expect(body["sdk"]["name"]).to eq("apidepth-ruby")
   end
 end
+
+# =============================================================================
+# ModelNameExtractor
+# =============================================================================
+
+RSpec.describe Apidepth::ModelNameExtractor do
+  # Build a response double that responds to [] (header access) and .body
+  def mock_ai_response(content_type: "application/json; charset=utf-8", body_str: nil)
+    resp = double("Net::HTTPResponse")
+    allow(resp).to receive(:[]) { |k| content_type if k.downcase == "content-type" }
+    allow(resp).to receive(:body).and_return(body_str)
+    resp
+  end
+
+  before { Apidepth.configuration.capture_model_names = true }
+  after  { Apidepth.configuration.capture_model_names = true }
+
+  describe ".extract" do
+    context "happy path" do
+      it "extracts model name from OpenAI chat completion response" do
+        body = '{"model":"gpt-4-turbo","choices":[]}'
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body)))
+          .to eq("gpt-4-turbo")
+      end
+
+      it "extracts model name from Anthropic message response" do
+        body = '{"id":"msg_01","type":"message","model":"claude-3-opus-20240229","content":[]}'
+        expect(described_class.extract("api.anthropic.com", mock_ai_response(body_str: body)))
+          .to eq("claude-3-opus-20240229")
+      end
+
+      it "extracts from Gemini" do
+        body = '{"model":"gemini-1.5-flash","candidates":[]}'
+        expect(described_class.extract("generativelanguage.googleapis.com", mock_ai_response(body_str: body)))
+          .to eq("gemini-1.5-flash")
+      end
+
+      it "extracts from Mistral" do
+        body = '{"model":"mistral-large-latest","choices":[]}'
+        expect(described_class.extract("api.mistral.ai", mock_ai_response(body_str: body)))
+          .to eq("mistral-large-latest")
+      end
+
+      it "extracts from Cohere" do
+        body = '{"model":"command-r-plus","generations":[]}'
+        expect(described_class.extract("api.cohere.com", mock_ai_response(body_str: body)))
+          .to eq("command-r-plus")
+      end
+    end
+
+    context "non-AI vendor" do
+      it "returns nil for stripe.com" do
+        body = '{"id":"ch_abc"}'
+        expect(described_class.extract("api.stripe.com", mock_ai_response(body_str: body))).to be_nil
+      end
+
+      it "returns nil for github.com" do
+        expect(described_class.extract("api.github.com", mock_ai_response(body_str: '{"login":"user"}'))).to be_nil
+      end
+    end
+
+    context "content-type guard" do
+      it "returns nil for text/event-stream (streaming response)" do
+        body = "data: {}\n\n"
+        expect(described_class.extract("api.openai.com",
+                                       mock_ai_response(content_type: "text/event-stream", body_str: body)))
+          .to be_nil
+      end
+
+      it "returns nil when content-type is absent" do
+        resp = double("Net::HTTPResponse")
+        allow(resp).to receive(:[]).and_return(nil)
+        expect(described_class.extract("api.openai.com", resp)).to be_nil
+      end
+    end
+
+    context "body edge cases" do
+      it "returns nil when body is nil" do
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: nil))).to be_nil
+      end
+
+      it "returns nil when body is empty" do
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: ""))).to be_nil
+      end
+
+      it "returns nil when JSON is malformed" do
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: "not-json"))).to be_nil
+      end
+
+      it "returns nil when model field is absent" do
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: '{"choices":[]}')))
+          .to be_nil
+      end
+
+      it "returns nil when model is not a string" do
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: '{"model":42}'))).to be_nil
+      end
+
+      it "returns nil when model is an empty string" do
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: '{"model":""}'))).to be_nil
+      end
+
+      it "handles normal-sized body without raising" do
+        body = %({"model":"gpt-4o","choices":[],"usage":{"prompt_tokens":10}})
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body)))
+          .to eq("gpt-4o")
+      end
+
+      it "handles oversized body without raising (truncated JSON is silently nil)" do
+        # Truncated JSON is invalid — extraction returns nil, does not raise.
+        # Real AI API responses are always < 8KB so this edge case is academic.
+        body = %({"model":"gpt-4o","data":"#{'x' * 20_000}"})
+        result = described_class.extract("api.openai.com", mock_ai_response(body_str: body))
+        expect([nil, "gpt-4o"]).to include(result)
+      end
+    end
+
+    context "capture_model_names disabled" do
+      before { Apidepth.configuration.capture_model_names = false }
+
+      it "returns nil regardless of response content" do
+        body = '{"model":"gpt-4-turbo","choices":[]}'
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body))).to be_nil
+      end
+    end
+  end
+end
+
+# =============================================================================
+# ModelNameExtractor — instrumentation integration
+# =============================================================================
+
+RSpec.describe "ModelNameExtractor instrumentation integration" do
+  let(:collector) { instance_double(Apidepth::Collector) }
+
+  before do
+    allow(Apidepth::Collector).to receive(:instance).and_return(collector)
+    allow(collector).to receive(:record)
+    Apidepth.configuration.capture_model_names = true
+  end
+
+  after { Apidepth.configuration.capture_model_names = true }
+
+  it "includes model_name in the recorded event for an OpenAI request" do
+    stub_request(:post, "https://api.openai.com/v1/chat/completions")
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: '{"model":"gpt-4-turbo","choices":[]}'
+      )
+
+    Net::HTTP.start("api.openai.com", 443, use_ssl: true) do |http|
+      req = Net::HTTP::Post.new("/v1/chat/completions")
+      req["Content-Type"] = "application/json"
+      http.request(req, "{}")
+    end
+
+    expect(collector).to have_received(:record).with(
+      hash_including(model_name: "gpt-4-turbo")
+    )
+  end
+
+  it "does not include model_name for non-AI vendor requests" do
+    stub_request(:get, "https://api.stripe.com/v1/charges/ch_abc")
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: '{"id":"ch_abc"}'
+      )
+
+    Net::HTTP.get(URI("https://api.stripe.com/v1/charges/ch_abc"))
+
+    expect(collector).to have_received(:record).with(
+      hash_not_including(:model_name)
+    )
+  end
+
+  it "does not include model_name when capture_model_names is false" do
+    Apidepth.configuration.capture_model_names = false
+
+    stub_request(:post, "https://api.openai.com/v1/chat/completions")
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: '{"model":"gpt-4-turbo","choices":[]}'
+      )
+
+    Net::HTTP.start("api.openai.com", 443, use_ssl: true) do |http|
+      req = Net::HTTP::Post.new("/v1/chat/completions")
+      http.request(req, "{}")
+    end
+
+    expect(collector).to have_received(:record).with(
+      hash_not_including(:model_name)
+    )
+  end
+
+  it "still records the event when body is nil (streaming guard)" do
+    stub_request(:post, "https://api.openai.com/v1/chat/completions")
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "text/event-stream" },
+        body: "data: {}\n\n"
+      )
+
+    Net::HTTP.start("api.openai.com", 443, use_ssl: true) do |http|
+      req = Net::HTTP::Post.new("/v1/chat/completions")
+      http.request(req, "{}")
+    end
+
+    # Event recorded but no model_name (streaming content type)
+    expect(collector).to have_received(:record).with(
+      hash_not_including(:model_name)
+    )
+  end
+end

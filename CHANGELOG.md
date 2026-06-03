@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.5.0](https://github.com/apidepth-io/apidepth-ruby/compare/apidepth/v0.4.0...apidepth/v0.5.0) (2026-06-03)
+
+
+### Features
+
+* add model name extraction from AI vendor response bodies ([#33](https://github.com/apidepth-io/apidepth-ruby/issues/33)) ([ef72551](https://github.com/apidepth-io/apidepth-ruby/commit/ef72551254d5cda9785725d44a32dc3465f58bb9))
+
 ## [0.4.0](https://github.com/apidepth-io/apidepth-ruby/compare/apidepth/v0.3.0...apidepth/v0.4.0) (2026-05-30)
 
 

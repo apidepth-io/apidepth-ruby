@@ -47,7 +47,9 @@ module Apidepth
 
     def self.extract(host, response)
       return nil unless Apidepth.configuration.capture_model_names
-      return nil unless AI_VENDOR_HOSTS.include?(host)
+      # Case-insensitive host match (RUBY-019): DNS hostnames are case-insensitive,
+      # so a vendor declared with mixed case (e.g. via extra_vendors) still matches.
+      return nil unless AI_VENDOR_HOSTS.include?(host.to_s.downcase)
       return nil unless response["content-type"]&.include?("application/json")
 
       body = response.body

@@ -2192,6 +2192,12 @@ RSpec.describe Apidepth::ModelNameExtractor do
         expect(described_class.extract("api.cohere.com", mock_ai_response(body_str: body)))
           .to eq("command-r-plus")
       end
+
+      it "matches AI vendor hosts case-insensitively (RUBY-019)" do
+        body = '{"model":"gpt-4-turbo","choices":[]}'
+        expect(described_class.extract("API.OpenAI.com", mock_ai_response(body_str: body)))
+          .to eq("gpt-4-turbo")
+      end
     end
 
     context "non-AI vendor" do

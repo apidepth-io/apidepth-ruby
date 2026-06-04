@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.5.1](https://github.com/apidepth-io/apidepth-ruby/compare/apidepth/v0.5.0...apidepth/v0.5.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* scoped regex timeout, robust model-name extraction, shared path normalization ([#35](https://github.com/apidepth-io/apidepth-ruby/issues/35)) ([ede6549](https://github.com/apidepth-io/apidepth-ruby/commit/ede6549c9953206e71f5d10d3d5cd8f4367f3aab))
+
 ## [0.5.0](https://github.com/apidepth-io/apidepth-ruby/compare/apidepth/v0.4.0...apidepth/v0.5.0) (2026-06-03)
 
 

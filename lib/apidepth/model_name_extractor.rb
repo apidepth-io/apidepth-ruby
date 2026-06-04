@@ -1,5 +1,4 @@
 # lib/apidepth/model_name_extractor.rb
-require "json"
 require "set"
 #
 # Extracts the model name from AI vendor JSON response bodies.
@@ -19,7 +18,12 @@ require "set"
 #
 # Streaming safety: streamed responses have Content-Type: text/event-stream, not
 # application/json. The content-type guard exits early before any body read.
-# The 8KB truncation is a belt-and-suspenders guard against unusually large bodies.
+#
+# Extraction strategy (RUBY-018): scan for the JSON "model": "<value>" field
+# with a linear regex rather than JSON.parse-ing a truncated body. Embeddings
+# and batch responses place `model` AFTER a large `data` array, so the old
+# parse-after-8KB-truncate approach produced invalid JSON and silently dropped
+# the model. The regex finds the first structural model field wherever it sits.
 
 module Apidepth
   module ModelNameExtractor
@@ -31,7 +35,15 @@ module Apidepth
       api.cohere.com
     ].to_set.freeze
 
-    MAX_BODY_BYTES = 8_192
+    # Upper bound on how far into the body we scan for the model field. 256 KB
+    # comfortably covers realistic embeddings/batch responses (a few-input OpenAI
+    # embeddings body is ~23 KB) while bounding work on pathologically large bodies.
+    MODEL_SCAN_MAX_BYTES = 262_144
+
+    # Matches a structural JSON "model": "<value>" pair. Escaped quotes inside
+    # string values appear as \" so this never matches a "model" mentioned inside
+    # another JSON string. First match wins (the top-level model field).
+    MODEL_RE = /"model"\s*:\s*"([^"]+)"/.freeze
 
     def self.extract(host, response)
       return nil unless Apidepth.configuration.capture_model_names
@@ -41,10 +53,13 @@ module Apidepth
       body = response.body
       return nil if body.nil? || body.empty?
 
-      parsed = JSON.parse(body.byteslice(0, MAX_BODY_BYTES), symbolize_names: true)
-      model = parsed[:model]
-      model.is_a?(String) && !model.empty? ? model : nil
-    rescue JSON::ParserError, Encoding::UndefinedConversionError, TypeError
+      scan = body.byteslice(0, MODEL_SCAN_MAX_BYTES).to_s.dup.force_encoding("UTF-8")
+      match = MODEL_RE.match(scan)
+      match && !match[1].empty? ? match[1] : nil
+    rescue StandardError
+      # Covers malformed/invalid-encoding bodies and non-buffered streaming
+      # bodies (e.g. Net::ReadAdapter, which has no #empty?). Returning nil keeps
+      # the surrounding telemetry event intact rather than dropping it (RUBY-017).
       nil
     end
   end

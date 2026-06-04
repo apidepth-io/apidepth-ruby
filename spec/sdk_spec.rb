@@ -374,6 +374,47 @@ RSpec.describe Apidepth::VendorRegistry do
       _, path = described_class.identify("api.badvendor.io", "/v1/items/item_abc123")
       expect(path).to eq("/safe")
     end
+
+    it "does not mutate the global Regexp.timeout during normalization (RUBY-020)" do
+      described_class.replace(registry_with_pattern('/v1/items/item_\w+'))
+      before = Regexp.timeout
+      described_class.identify("api.badvendor.io", "/v1/items/item_abc123")
+      expect(Regexp.timeout).to eq(before)
+    end
+
+    it "compiles registry patterns with a per-pattern timeout on Ruby >= 3.2 (RUBY-020)" do
+      skip "Regexp.timeout requires Ruby >= 3.2" unless Apidepth::VendorRegistry::RUBY_GTE_3_2
+      described_class.replace(registry_with_pattern('/v1/items/item_\w+'))
+      compiled = described_class.instance_variable_get(:@patterns)["badvendor"].first.first
+      expect(compiled.timeout).to eq(0.001)
+    end
+  end
+
+  describe "endpoint normalization — shared fixture (XSDK-NORM)" do
+    # Fixture lives in apidepth-collector/tests/fixtures/endpoint_cases.json and is
+    # shared by every SDK so VendorRegistry.identify produces identical endpoints.
+    fixture_paths = [
+      File.expand_path("../../apidepth-collector/tests/fixtures/endpoint_cases.json", __dir__),
+      File.expand_path("../apidepth-collector/tests/fixtures/endpoint_cases.json", __dir__)
+    ]
+    fixture_path = fixture_paths.find { |p| File.exist?(p) }
+
+    if fixture_path
+      before { described_class.replace(described_class::BUNDLED_BASELINE) }
+      after  { described_class.replace(described_class::BUNDLED_BASELINE) }
+
+      fixture = JSON.parse(File.read(fixture_path))
+      fixture["cases"].each do |tc|
+        it "#{tc['label']}: #{tc['host']}#{tc['path']}" do
+          _, endpoint = described_class.identify(tc["host"], tc["path"])
+          expect(endpoint).to eq(tc["expected"])
+        end
+      end
+    else
+      it "requires the fixture" do
+        pending "endpoint_cases.json not found — clone apidepth-collector alongside this repo"
+      end
+    end
   end
 end
 
@@ -2211,12 +2252,35 @@ RSpec.describe Apidepth::ModelNameExtractor do
           .to eq("gpt-4o")
       end
 
-      it "handles oversized body without raising (truncated JSON is silently nil)" do
-        # Truncated JSON is invalid — extraction returns nil, does not raise.
-        # Real AI API responses are always < 8KB so this edge case is academic.
-        body = %({"model":"gpt-4o","data":"#{'x' * 20_000}"})
-        result = described_class.extract("api.openai.com", mock_ai_response(body_str: body))
-        expect([nil, "gpt-4o"]).to include(result)
+      it "captures the model from a large body when the field is near the start" do
+        body = %({"model":"gpt-4o","data":"#{"x" * 20_000}"})
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body)))
+          .to eq("gpt-4o")
+      end
+
+      it "captures a model field that follows a large data array (embeddings-style, >8KB) (RUBY-018)" do
+        body = %({"object":"list","data":["#{"x" * 8200}"],"model":"text-embedding-3-small"})
+        expect(body.bytesize).to be > 8_192
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body)))
+          .to eq("text-embedding-3-small")
+      end
+
+      it "returns nil when the model field is beyond the scan bound" do
+        beyond = Apidepth::ModelNameExtractor::MODEL_SCAN_MAX_BYTES
+        body = %({"data":["#{"x" * beyond}"],"model":"too-far-away"})
+        expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body))).to be_nil
+      end
+
+      it "returns nil (not raise) for a non-buffered streaming body (RUBY-017)" do
+        # A block-form streaming request yields a Net::ReadAdapter for #body,
+        # which has no #empty? — extract must swallow it and keep the event,
+        # not let a NoMethodError bubble up and drop the whole telemetry event.
+        adapter = Object.new # does not respond to #empty?
+        resp = double("Net::HTTPResponse")
+        allow(resp).to receive(:[]) { |k| "application/json" if k.downcase == "content-type" }
+        allow(resp).to receive(:body).and_return(adapter)
+        expect { described_class.extract("api.openai.com", resp) }.not_to raise_error
+        expect(described_class.extract("api.openai.com", resp)).to be_nil
       end
     end
 

@@ -376,6 +376,7 @@ RSpec.describe Apidepth::VendorRegistry do
     end
 
     it "does not mutate the global Regexp.timeout during normalization (RUBY-020)" do
+      skip "Regexp.timeout requires Ruby >= 3.2" unless Apidepth::VendorRegistry::RUBY_GTE_3_2
       described_class.replace(registry_with_pattern('/v1/items/item_\w+'))
       before = Regexp.timeout
       described_class.identify("api.badvendor.io", "/v1/items/item_abc123")

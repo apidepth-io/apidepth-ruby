@@ -2253,13 +2253,13 @@ RSpec.describe Apidepth::ModelNameExtractor do
       end
 
       it "captures the model from a large body when the field is near the start" do
-        body = %({"model":"gpt-4o","data":"#{"x" * 20_000}"})
+        body = %({"model":"gpt-4o","data":"#{'x' * 20_000}"})
         expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body)))
           .to eq("gpt-4o")
       end
 
       it "captures a model field that follows a large data array (embeddings-style, >8KB) (RUBY-018)" do
-        body = %({"object":"list","data":["#{"x" * 8200}"],"model":"text-embedding-3-small"})
+        body = %({"object":"list","data":["#{'x' * 8200}"],"model":"text-embedding-3-small"})
         expect(body.bytesize).to be > 8_192
         expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body)))
           .to eq("text-embedding-3-small")
@@ -2267,7 +2267,7 @@ RSpec.describe Apidepth::ModelNameExtractor do
 
       it "returns nil when the model field is beyond the scan bound" do
         beyond = Apidepth::ModelNameExtractor::MODEL_SCAN_MAX_BYTES
-        body = %({"data":["#{"x" * beyond}"],"model":"too-far-away"})
+        body = %({"data":["#{'x' * beyond}"],"model":"too-far-away"})
         expect(described_class.extract("api.openai.com", mock_ai_response(body_str: body))).to be_nil
       end
 

@@ -58,11 +58,21 @@ module Apidepth
       }
     }.freeze
 
+    # Generic fallbacks applied after vendor-specific patterns. Canonical across
+    # all SDKs (XSDK-NORM) — see apidepth-collector/tests/fixtures/endpoint_cases.json.
+    # The :token rule requires at least one digit (?=[a-z0-9]*\d) so 24+ char
+    # readable slugs are left intact while opaque IDs/tokens — which effectively
+    # always contain a digit — are collapsed. UUID is case-insensitive.
     GENERIC_PATTERNS = [
-      [%r{/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}, "/:uuid"],
-      [%r{/\d{4,}},        "/:id"],
-      [%r{/[a-z0-9]{24,}}, "/:token"]
+      [%r{/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}i, "/:uuid"],
+      [%r{/\d{4,}}, "/:id"],
+      [%r{/(?=[a-z0-9]*\d)[a-z0-9]{24,}}i, "/:token"]
     ].freeze
+
+    # Upper bound on path length we run the generic normalizers against. Realistic
+    # paths are well under 4 KB; above this we skip normalization because the
+    # :token lookahead is O(n^2) worst-case on a long digit-free alnum run.
+    GENERIC_MAX_PATH = 4096
 
     # True when the runtime supports Regexp.timeout (introduced in Ruby 3.2).
     # Used by apply_vendor_normalizers to enable ReDoS protection when available.
@@ -157,7 +167,13 @@ module Apidepth
                 next
               end
 
-              [Regexp.new(match), rule["replace"].to_s]
+              # ReDoS protection: bake a per-pattern timeout into the Regexp at
+              # compile time on Ruby >= 3.2 (RUBY-020). This bounds match time for
+              # a pathological pattern from a compromised/misconfigured registry
+              # without mutating the process-global Regexp.timeout on every request
+              # (which would impose the limit on unrelated regexes in other threads).
+              compiled = RUBY_GTE_3_2 ? Regexp.new(match, timeout: 0.001) : Regexp.new(match)
+              [compiled, rule["replace"].to_s]
             rescue RegexpError => e
               Apidepth.logger&.warn(
                 "[Apidepth] Skipping invalid pattern for #{Apidepth.sanitize_log(slug)} " \
@@ -179,25 +195,23 @@ module Apidepth
       # broader catch-alls (e.g. /v1/:resource/:id). A less-specific rule placed
       # earlier will shadow any more-specific rules that follow it.
       #
-      # ReDoS protection: on Ruby >= 3.2 we apply a per-match timeout of 1ms so
-      # that a pathological pattern from a compromised or misconfigured registry
-      # cannot stall the request thread indefinitely. On older Ruby, Regexp.timeout
-      # is not available — use a trusted, internally-reviewed registry source.
+      # ReDoS protection: each compiled pattern carries its own 1ms timeout (set
+      # in build_patterns on Ruby >= 3.2), so a pathological pattern from a
+      # compromised or misconfigured registry cannot stall the request thread
+      # indefinitely — without touching the process-global Regexp.timeout
+      # (RUBY-020). On older Ruby the timeout is absent; use a trusted,
+      # internally-reviewed registry source. A Regexp::TimeoutError that trips
+      # here propagates to identify's caller, which already rescues StandardError.
       def apply_vendor_normalizers(rules, path)
-        if RUBY_GTE_3_2
-          saved_timeout = Regexp.timeout
-          Regexp.timeout = 0.001
-        end
-
         rules.each do |pattern, replacement|
           return path.gsub(pattern, replacement) if path.match?(pattern)
         end
         path
-      ensure
-        Regexp.timeout = saved_timeout if RUBY_GTE_3_2
       end
 
       def apply_generic_normalizers(path)
+        return path if path.length > GENERIC_MAX_PATH
+
         GENERIC_PATTERNS.reduce(path) do |p, (pattern, replacement)|
           p.gsub(pattern, replacement)
         end
